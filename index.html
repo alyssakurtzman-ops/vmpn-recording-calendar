@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VMPN Recording Calendar</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --text-primary: #1a1a1a;
+    --text-secondary: #555;
+    --text-muted: #888;
+    --text-accent: #2563eb;
+    --surface-0: #f8f8f8;
+    --surface-1: #f0f0f0;
+    --surface-2: #ffffff;
+    --border: #e0e0e0;
+    --border-strong: #ccc;
+    --border-accent: #93c5fd;
+    --bg-accent: #eff6ff;
+    --bg-success: #f0fdf4;
+    --border-success: #86efac;
+    --text-success: #166534;
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-sans);
+    background: #f5f5f5;
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  .page-wrap { max-width: 1100px; margin: 0 auto; }
+  .cal-wrap { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .toolbar-title { font-size: 18px; font-weight: 600; color: var(--text-primary); flex: 1; min-width: 160px; }
+  .toolbar-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .view-toggle { display: flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+  .vt-btn { background: transparent; border: none; padding: 6px 12px; font-size: 12px; color: var(--text-secondary); cursor: pointer; font-family: var(--font-sans); }
+  .vt-btn.active { background: var(--surface-1); color: var(--text-primary); font-weight: 500; }
+  .sync-row { display: flex; align-items: center; gap: 8px; }
+  .refresh-btn { background: transparent; border: 1px solid var(--border-accent); color: var(--text-accent); border-radius: var(--radius); padding: 5px 11px; font-size: 12px; cursor: pointer; font-family: var(--font-sans); }
+  .refresh-btn:hover { background: var(--bg-accent); }
+  .sync-time { font-size: 11px; color: var(--text-muted); }
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+  .filter-label { font-size: 12px; color: var(--text-secondary); margin-right: 2px; }
+  .show-pill { font-size: 11px; padding: 3px 10px; border-radius: 20px; cursor: pointer; border: 1.5px solid transparent; white-space: nowrap; font-weight: 500; transition: opacity 0.15s; user-select: none; }
+  .show-pill.off { opacity: 0.3; }
+  .nav-row { display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem; }
+  .nav-btn { background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 5px 13px; cursor: pointer; font-size: 14px; color: var(--text-primary); font-family: var(--font-sans); }
+  .nav-btn:hover { background: var(--surface-1); }
+  .month-label { font-size: 16px; font-weight: 600; color: var(--text-primary); min-width: 140px; text-align: center; }
+  .dow-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; margin-bottom: 1px; }
+  .dow { font-size: 10px; color: var(--text-muted); text-align: center; padding: 4px 0; text-transform: uppercase; letter-spacing: .05em; font-weight: 500; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .day-cell { background: var(--surface-2); min-height: 100px; padding: 6px 5px; }
+  .day-cell.other { background: var(--surface-0); opacity: .55; }
+  .day-cell.today { background: var(--bg-accent); }
+  .day-num { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+  .day-cell.today .day-num { color: var(--text-accent); font-weight: 700; }
+  .ev { font-size: 10px; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px; cursor: pointer; line-height: 1.35; font-weight: 500; overflow: hidden; }
+  .ev:hover { filter: brightness(.88); }
+  .ev-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .ev-time { font-size: 9px; opacity: .72; display: block; white-space: nowrap; }
+  .more { font-size: 10px; color: var(--text-accent); cursor: pointer; margin-top: 2px; padding: 0 2px; }
+  .more:hover { text-decoration: underline; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--border); }
+  .leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+  .leg-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-start; justify-content: center; padding-top: 60px; z-index: 200; }
+  .modal-card { background: #fff; border: 1px solid var(--border-strong); border-radius: 12px; padding: 1.4rem; width: 420px; max-width: 94vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.12); }
+  .mc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 8px; }
+  .mc-title { font-size: 15px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+  .mc-close { cursor: pointer; color: var(--text-muted); font-size: 22px; line-height: 1; flex-shrink: 0; padding-left: 4px; }
+  .mc-close:hover { color: var(--text-primary); }
+  .mc-badge { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; margin-bottom: 14px; }
+  .mc-row { display: flex; gap: 8px; margin-bottom: 9px; font-size: 13px; align-items: flex-start; }
+  .mc-key { color: var(--text-secondary); min-width: 90px; flex-shrink: 0; padding-top: 1px; }
+  .mc-val { color: var(--text-primary); line-height: 1.4; }
+  .mc-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .talent-chip { display: inline-block; background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 2px 8px; font-size: 12px; color: var(--text-primary); margin: 2px 3px 2px 0; }
+  /* List */
+  .list-view { margin-top: .25rem; }
+  .list-day { margin-bottom: 1.1rem; }
+  .list-day-hdr { font-size: 11px; font-weight: 600; color: var(--text-secondary); padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
+  .list-ev { display: flex; align-items: center; gap: 9px; padding: 7px 5px; border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 4px; }
+  .list-ev:hover { background: var(--surface-0); }
+  .list-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .list-show { font-weight: 600; color: var(--text-primary); font-size: 13px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-booking { font-size: 11px; color: var(--text-secondary); flex: 1.5; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-pod { font-size: 11px; color: var(--text-muted); white-space: nowrap; min-width: 50px; }
+  .list-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+  /* Notif */
+  .notif { background: var(--bg-success); border: 1px solid var(--border-success); border-radius: var(--radius); padding: 8px 14px; font-size: 12px; color: var(--text-success); margin-bottom: .85rem; display: none; align-items: center; gap: 8px; }
+  .notif.show { display: flex; }
+  /* Source note */
+  .source-note { font-size: 11px; color: var(--text-muted); margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); }
+  .source-note a { color: var(--text-accent); text-decoration: none; }
+  .source-note a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+<div class="cal-wrap">
+
+<div class="notif" id="notif">✓ <span id="notif-msg"></span></div>
+
+<div class="toolbar">
+  <div>
+    <div class="toolbar-title">VMPN Recording Calendar</div>
+    <div class="toolbar-sub">Studio pod recording sessions · June–September 2026</div>
+  </div>
+  <div class="view-toggle">
+    <button class="vt-btn active" id="btn-month" onclick="setView('month')">Month</button>
+    <button class="vt-btn" id="btn-list" onclick="setView('list')">List</button>
+  </div>
+  <div class="sync-row">
+    <button class="refresh-btn" onclick="refreshData()">↻ Sync</button>
+    <span class="sync-time" id="sync-time">Source: Studio Bookings Sheet</span>
+  </div>
+</div>
+
+<div class="filter-row" id="filter-row"><span class="filter-label">Show:</span></div>
+
+<div id="month-view">
+  <div class="nav-row">
+    <button class="nav-btn" onclick="prevMonth()">‹ Prev</button>
+    <span class="month-label" id="month-label"></span>
+    <button class="nav-btn" onclick="nextMonth()">Next ›</button>
+  </div>
+  <div class="dow-row">
+    <div class="dow">Sun</div><div class="dow">Mon</div><div class="dow">Tue</div>
+    <div class="dow">Wed</div><div class="dow">Thu</div><div class="dow">Fri</div><div class="dow">Sat</div>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="legend" id="legend"></div>
+</div>
+
+<div id="list-view" style="display:none" class="list-view"></div>
+<div id="modal-root"></div>
+
+<div class="source-note">
+  Data source: <a href="https://docs.google.com/spreadsheets/d/1KwN7srKRAcBATpEc57zfkZIt_cxFdg4LrNt9SBY7xKA/edit" target="_blank">VMPN Studio Bookings Sheet</a> &nbsp;·&nbsp; Last exported: <span id="export-date"></span>
+</div>
+
+</div>
+</div>
+
+<script>
+document.getElementById('export-date').textContent = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+const E = [
+  {d:'6/29/2026',s:'11:00 AM',e:'12:00 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'Video + Audio Record',talent:'Jessica Tarlov'},
+  {d:'6/29/2026',s:'12:30 PM',e:'1:00 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates Livestream – Josh Turek',pod:'Pod 4',type:'Video + Audio Record',talent:'Jessica Tarlov'},
+  {d:'6/29/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'6/29/2026',s:'4:00 PM',e:'5:15 PM',show:'The Vergecast',booking:'Vergecast – Infowars',pod:'Pod 1',type:'Video + Audio Record',talent:'Mia Sato, Ben Collins, Tim Heidecker'},
+  {d:'6/30/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'6/30/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/1/2026',s:'12:00 PM',e:'12:45 PM',show:'Prof G: Raging Moderates',booking:'Raging Perspective',pod:'Pod 4',type:'Video + Audio Record',talent:'Jessica Tarlov'},
+  {d:'7/1/2026',s:'1:00 PM',e:'3:00 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'7/1/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/2/2026',s:'1:00 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/2/2026',s:'2:00 PM',e:'5:00 PM',show:'Unexplainable',booking:'UNX: Seven Sisters – Noam downloads to Sally',pod:'Pod 5',type:'Video + Audio Record',talent:'NA'},
+  {d:'7/2/2026',s:'3:15 PM',e:'4:00 PM',show:'Prof G: Markets',booking:'Ed Elson MSNOW Hit',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'7/6/2026',s:'11:00 AM',e:'12:00 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates (Jessica + Guest)',pod:'Pod 1',type:'Video + Audio Record',talent:'Jessica Tarlov + Guest – Leigh McGowan'},
+  {d:'7/6/2026',s:'12:00 PM',e:'1:15 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/6/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'7/6/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/7/2026',s:'11:00 AM',e:'12:00 PM',show:'Channels with Peter Kafka',booking:'Channels w/ Peter Kafka Recording',pod:'Pod 1',type:'Audio Only Record',talent:'Peter Kafka and Joe Kahn'},
+  {d:'7/7/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'7/7/2026',s:'11:45 AM',e:'12:30 PM',show:'America, Actually',booking:'AA making plates',pod:'Pod 2',type:'Video + Audio Record',talent:'Kasia'},
+  {d:'7/7/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'7/7/2026',s:'1:00 PM',e:'4:00 PM',show:'Switched On Pop',booking:'SOP Netflix Taping',pod:'Pod 2',type:'Video + Audio Record',talent:'Nate Sloan, Charlie Harding'},
+  {d:'7/7/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/8/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/8/2026',s:'9:00 AM',e:'5:00 PM',show:'Where Should We Begin',booking:'Esther Perel podcasts',pod:'Pod 1',type:'Video + Audio Record',talent:'Esther Perel'},
+  {d:'7/8/2026',s:'11:45 AM',e:'4:00 PM',show:'Project Swagger',booking:'Project Swagger Taping',pod:'Pod 3',type:'Video + Audio Record',talent:'Robin Arzon'},
+  {d:'7/9/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/9/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'7/9/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'7/9/2026',s:'2:15 PM',e:'4:15 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'7/10/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/10/2026',s:'9:45 AM',e:'11:00 AM',show:'Create or Destroy',booking:'Create or Destroy – Carla Hassan',pod:'Pod 1',type:'Video + Audio Record',talent:'Carla Hassan'},
+  {d:'7/10/2026',s:'9:45 AM',e:'11:45 AM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/10/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'7/13/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/13/2026',s:'11:00 AM',e:'2:00 PM',show:'Networth & Chill',booking:'RECORDING // Networth & Chill',pod:'Pod 4',type:'',talent:'TBD'},
+  {d:'7/13/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'7/13/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/14/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/14/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'7/14/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'7/14/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'7/14/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/15/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/15/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/16/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/16/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'7/16/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'7/16/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'7/16/2026',s:'1:00 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/16/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'7/17/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/17/2026',s:'9:45 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'Markets Founder Series',pod:'Pod 4',type:'Video + Audio Record',talent:'TBD'},
+  {d:'7/17/2026',s:'10:00 AM',e:'12:00 PM',show:'Other / External',booking:'NJF',pod:'Pod 1',type:'Video + Audio Record',talent:'TBD'},
+  {d:'7/17/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'7/20/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/20/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'7/20/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/21/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/21/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'7/21/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'7/21/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'7/21/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/22/2026',s:'6:00 AM',e:'10:00 PM',show:'Version History',booking:'Version History S5',pod:'Pod 6',type:'',talent:'David Pierce, Nilay Patel and others'},
+  {d:'7/22/2026',s:'9:00 AM',e:'5:00 PM',show:'Where Should We Begin',booking:"Esther Perel's HOLD",pod:'Pod 1',type:'Video + Audio Record',talent:'Esther Perel'},
+  {d:'7/22/2026',s:'11:45 AM',e:'4:00 PM',show:'Project Swagger',booking:'Project Swagger Taping',pod:'Pod 3',type:'Video + Audio Record',talent:'Robin Arzon'},
+  {d:'7/22/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/23/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'7/23/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'7/23/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'7/23/2026',s:'1:00 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/23/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'7/24/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'7/27/2026',s:'12:00 PM',e:'1:30 PM',show:'Pivot',booking:'Kara Swisher for Pivot',pod:'Pod 1',type:'Video + Audio Record',talent:'Kara for Pivot Recording'},
+  {d:'7/27/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'7/27/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/28/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'7/28/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'7/28/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'7/28/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/29/2026',s:'1:00 PM',e:'2:00 PM',show:'Cut Social',booking:'Chantal x Lucia – Walmart Story Filming',pod:'Pod 5',type:'Video + Audio Record',talent:'Lucia Tonelli, Chantal Fernandez'},
+  {d:'7/29/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/30/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'7/30/2026',s:'11:00 AM',e:'12:00 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 5',type:'Video + Audio Record',talent:'Jessica Tarlov'},
+  {d:'7/30/2026',s:'12:00 PM',e:'2:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'7/30/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'7/30/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'7/31/2026',s:'9:30 AM',e:'3:30 PM',show:'Decoder',booking:'Decoder',pod:'Pod 1',type:'Video + Audio Record',talent:'Nilay Patel and Bose CEO Lila Snyder'},
+  {d:'7/31/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'8/3/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'8/3/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'8/4/2026',s:'10:30 AM',e:'11:45 AM',show:'Prof G: Markets',booking:'Prof G Markets – Live Stream',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'8/4/2026',s:'12:00 PM',e:'1:00 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/4/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'8/4/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'8/6/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'8/6/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/6/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'8/6/2026',s:'1:00 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'8/6/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'8/7/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'8/10/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'8/10/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'8/11/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/11/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'8/11/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'8/11/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'8/12/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'8/13/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'8/13/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/13/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'8/13/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'8/14/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'8/17/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'8/18/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/18/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'8/20/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'8/20/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/20/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'8/20/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'8/21/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'8/24/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'8/25/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/25/2026',s:'1:00 PM',e:'3:00 PM',show:'A Touch More',booking:'ATM RECORDING',pod:'Pod 1',type:'',talent:'Megan Rapinoe and Sue Bird'},
+  {d:'8/27/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'8/27/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'8/27/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'8/31/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'8/31/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/1/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/1/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'9/1/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/2/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/3/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/3/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/3/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'9/3/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'9/4/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/7/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'9/7/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/8/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/8/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'9/8/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/9/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/10/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/10/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/10/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'9/10/2026',s:'1:00 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/10/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'9/11/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/14/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'9/14/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/15/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/15/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'9/15/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/16/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/17/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/17/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/17/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'9/17/2026',s:'1:00 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/17/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'9/18/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/21/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'9/21/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/22/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/22/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'9/22/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/23/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/24/2026',s:'11:00 AM',e:'11:15 AM',show:'Prof G: Markets',booking:'The Week, from Prof G Media',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/24/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/24/2026',s:'12:30 PM',e:'1:45 PM',show:'That Sounds Like A Lot',booking:'That Sounds Like A Lot – Monologue',pod:'Pod 1',type:'',talent:'Seth Matlins'},
+  {d:'9/24/2026',s:'1:00 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Main',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/24/2026',s:'2:00 PM',e:'4:30 PM',show:'The Vergecast',booking:'Vergecast',pod:'Pod 1',type:'',talent:'Nilay Patel, potentially others'},
+  {d:'9/25/2026',s:'12:30 PM',e:'1:15 PM',show:'No Mercy / No Malice',booking:'No Mercy / No Malice',pod:'Pod 4',type:'',talent:'George Hahn'},
+  {d:'9/28/2026',s:'3:00 PM',e:'5:00 PM',show:'Matt Buechele / TSLAL',booking:'TSLAL w/ Matt Buechele',pod:'Pod 1',type:'Video + Audio Record',talent:'Matt Buechele & TBD'},
+  {d:'9/28/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+  {d:'9/29/2026',s:'11:30 AM',e:'12:15 PM',show:'Prof G: Raging Moderates',booking:'Raging Moderates',pod:'Pod 4',type:'',talent:'Jessica Tarlov'},
+  {d:'9/29/2026',s:'12:30 PM',e:'3:00 PM',show:'Prof G: Markets',booking:'Markets Interview',pod:'Pod 4',type:'Video + Audio Record',talent:'Ed Elson'},
+  {d:'9/29/2026',s:'3:30 PM',e:'5:00 PM',show:'Prof G: Markets',booking:'Markets Daily',pod:'Pod 4',type:'',talent:'Ed Elson'},
+];
+
+const PALETTE=[
+  {bg:'#d6e8fa',tx:'#0c447c'},{bg:'#c8f0e0',tx:'#085041'},{bg:'#fce8d8',tx:'#4a1b0c'},
+  {bg:'#ece8fc',tx:'#26215c'},{bg:'#fde8f0',tx:'#4b1528'},{bg:'#faf3da',tx:'#412402'},
+  {bg:'#dff4e8',tx:'#173404'},{bg:'#f9e0e0',tx:'#501313'},{bg:'#e8f4fc',tx:'#042c53'},
+  {bg:'#f5ece0',tx:'#3a2010'},{bg:'#e4f0e8',tx:'#1a3a22'},{bg:'#f0e8f8',tx:'#3a1560'},
+];
+const CLR={};let ci=0;
+function clr(s){if(!CLR[s]){CLR[s]=PALETTE[ci%PALETTE.length];ci++;}return CLR[s];}
+const allShows=[...new Set(E.map(e=>e.show))];
+allShows.forEach(s=>clr(s));
+
+let active=new Set(allShows);
+let view='month';
+let vDate=new Date(2026,5,1);
+
+function pDate(str){const[m,d,y]=str.split('/');return new Date(+y,+m-1,+d);}
+function fmtTime(t){return t.replace(':00','').replace(' AM',' am').replace(' PM',' pm');}
+
+function setView(v){
+  view=v;
+  document.getElementById('month-view').style.display=v==='month'?'':'none';
+  document.getElementById('list-view').style.display=v==='list'?'':'none';
+  document.getElementById('btn-month').classList.toggle('active',v==='month');
+  document.getElementById('btn-list').classList.toggle('active',v==='list');
+  v==='list'?renderList():renderMonth();
+}
+
+function buildFilters(){
+  const row=document.getElementById('filter-row');
+  row.innerHTML='<span class="filter-label">Show:</span>';
+  allShows.forEach(show=>{
+    const c=clr(show);
+    const p=document.createElement('span');
+    p.className='show-pill'+(active.has(show)?'':' off');
+    p.style.cssText=`background:${c.bg};color:${c.tx};border-color:${c.tx}35`;
+    p.textContent=show;
+    p.onclick=()=>{
+      active.has(show)?active.delete(show):active.add(show);
+      p.classList.toggle('off',!active.has(show));
+      view==='month'?renderMonth():renderList();
+    };
+    row.appendChild(p);
+  });
+}
+
+function filtered(){return E.filter(e=>active.has(e.show));}
+
+function renderMonth(){
+  const grid=document.getElementById('cal-grid');
+  const label=document.getElementById('month-label');
+  const y=vDate.getFullYear(),m=vDate.getMonth();
+  const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  label.textContent=MONTHS[m]+' '+y;
+  const first=new Date(y,m,1).getDay();
+  const dim=new Date(y,m+1,0).getDate();
+  const today=new Date();
+  const byDate={};
+  filtered().forEach(ev=>{const k=ev.d;(byDate[k]=byDate[k]||[]).push(ev);});
+  let cells=[];
+  const prev=new Date(y,m,0).getDate();
+  for(let i=first-1;i>=0;i--)cells.push({day:prev-i,curr:false});
+  for(let d=1;d<=dim;d++)cells.push({day:d,curr:true,dateObj:new Date(y,m,d)});
+  while(cells.length%7)cells.push({day:cells.length-first-dim+1,curr:false});
+  grid.innerHTML=cells.map(cell=>{
+    const isToday=cell.curr&&cell.dateObj&&
+      cell.dateObj.getFullYear()===today.getFullYear()&&
+      cell.dateObj.getMonth()===today.getMonth()&&
+      cell.dateObj.getDate()===today.getDate();
+    const dateStr=cell.curr&&cell.dateObj?
+      `${cell.dateObj.getMonth()+1}/${cell.dateObj.getDate()}/${cell.dateObj.getFullYear()}`:'';
+    const evs=byDate[dateStr]||[];
+    const show2=evs.slice(0,2);
+    const extra=evs.length-2;
+    const pills=show2.map((ev,idx)=>{
+      const c=clr(ev.show);
+      return `<div class="ev" style="background:${c.bg};color:${c.tx}" onclick="openModal(event,'${dateStr}',${idx})" title="${ev.booking} | ${ev.s}–${ev.e}">
+        <span class="ev-name">${ev.show}</span>
+        <span class="ev-time">${fmtTime(ev.s)}–${fmtTime(ev.e)}</span>
+      </div>`;
+    }).join('');
+    const moreTxt=extra>0?`<div class="more" onclick="openDay(event,'${dateStr}')">+${extra} more</div>`:'';
+    return `<div class="day-cell${cell.curr?'':' other'}${isToday?' today':''}">
+      <div class="day-num">${cell.day}</div>${pills}${moreTxt}</div>`;
+  }).join('');
+  renderLegend();
+}
+
+function renderLegend(){
+  const leg=document.getElementById('legend');
+  leg.innerHTML=allShows.map(s=>{
+    const c=clr(s);
+    return `<div class="leg-item"><div class="leg-dot" style="background:${c.bg};border:1px solid ${c.tx}40"></div><span>${s}</span></div>`;
+  }).join('');
+}
+
+function renderList(){
+  const con=document.getElementById('list-view');
+  const byDate={};
+  filtered().forEach(ev=>{(byDate[ev.d]=byDate[ev.d]||[]).push(ev);});
+  const sorted=Object.keys(byDate).sort((a,b)=>pDate(a)-pDate(b));
+  const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  con.innerHTML=sorted.map(date=>{
+    const d=pDate(date);
+    const dow=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    const hdr=`${dow}, ${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    const rows=byDate[date].map((ev,idx)=>{
+      const c=clr(ev.show);
+      return `<div class="list-ev" onclick="openModal(event,'${date}',${idx})">
+        <div class="list-dot" style="background:${c.bg};border:1px solid ${c.tx}50"></div>
+        <div class="list-show">${ev.show}</div>
+        <div class="list-booking">${ev.booking}</div>
+        <div class="list-pod">${ev.pod}</div>
+        <div class="list-time">${fmtTime(ev.s)}–${fmtTime(ev.e)}</div>
+      </div>`;
+    }).join('');
+    return `<div class="list-day"><div class="list-day-hdr">${hdr}</div>${rows}</div>`;
+  }).join('');
+}
+
+function openModal(e,dateStr,idx){
+  e.stopPropagation();
+  const evs=E.filter(ev=>ev.d===dateStr&&active.has(ev.show));
+  const ev=evs[idx];if(!ev)return;
+  showModal(ev);
+}
+
+function openDay(e,dateStr){
+  e.stopPropagation();
+  const evs=E.filter(ev=>ev.d===dateStr&&active.has(ev.show));
+  const d=pDate(dateStr);
+  const MO=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const rows=evs.map((ev,idx)=>{
+    const c=clr(ev.show);
+    return `<div class="list-ev" onclick="showModalDirect(${JSON.stringify(ev).replace(/"/g,'&quot;')})">
+      <div class="list-dot" style="background:${c.bg};border:1px solid ${c.tx}50"></div>
+      <div class="list-show">${ev.show}</div>
+      <div class="list-time">${fmtTime(ev.s)}–${fmtTime(ev.e)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('modal-root').innerHTML=`<div class="modal-bg" onclick="closeModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="mc-header"><span class="mc-title">${MO[d.getMonth()]} ${d.getDate()}</span><span class="mc-close" onclick="closeModal()">×</span></div>
+      ${rows}
+    </div></div>`;
+}
+
+function showModalDirect(ev){
+  document.getElementById('modal-root').innerHTML='';
+  showModal(ev);
+}
+
+function showModal(ev){
+  const c=clr(ev.show);
+  const talentChips=ev.talent&&ev.talent!=='—'&&ev.talent!=='No'&&ev.talent!=='NA'?
+    ev.talent.split(/,\s*/).map(t=>`<span class="talent-chip">${t.trim()}</span>`).join('')
+    :'<span style="color:#888;font-size:13px">—</span>';
+  document.getElementById('modal-root').innerHTML=`<div class="modal-bg" onclick="closeModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="mc-header">
+        <span class="mc-title">${ev.booking}</span>
+        <span class="mc-close" onclick="closeModal()">×</span>
+      </div>
+      <span class="mc-badge" style="background:${c.bg};color:${c.tx}">${ev.show}</span>
+      <hr class="mc-divider">
+      <div class="mc-row"><span class="mc-key">📅 Date</span><span class="mc-val">${ev.d}</span></div>
+      <div class="mc-row"><span class="mc-key">🕐 Time</span><span class="mc-val">${ev.s} – ${ev.e}</span></div>
+      <div class="mc-row"><span class="mc-key">📺 Studio</span><span class="mc-val">${ev.pod}</span></div>
+      ${ev.type?`<div class="mc-row"><span class="mc-key">🎬 Type</span><span class="mc-val">${ev.type}</span></div>`:''}
+      <hr class="mc-divider">
+      <div class="mc-row" style="align-items:flex-start"><span class="mc-key" style="padding-top:4px">🎤 Talent</span><span class="mc-val">${talentChips}</span></div>
+    </div></div>`;
+}
+
+function closeModal(){document.getElementById('modal-root').innerHTML='';}
+function prevMonth(){vDate=new Date(vDate.getFullYear(),vDate.getMonth()-1,1);renderMonth();}
+function nextMonth(){vDate=new Date(vDate.getFullYear(),vDate.getMonth()+1,1);renderMonth();}
+
+function refreshData(){
+  const now=new Date();
+  document.getElementById('sync-time').textContent=`Synced ${now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
+  notify('Calendar synced — no changes detected.');
+}
+function notify(msg){
+  const b=document.getElementById('notif');
+  document.getElementById('notif-msg').textContent=msg;
+  b.classList.add('show');
+  setTimeout(()=>b.classList.remove('show'),5000);
+}
+
+buildFilters();
+renderMonth();
+</script>
+</body>
+</html>
