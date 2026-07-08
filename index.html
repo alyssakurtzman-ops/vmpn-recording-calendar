@@ -37,7 +37,7 @@
   .vt-btn { background: transparent; border: none; padding: 6px 12px; font-size: 12px; color: var(--text-secondary); cursor: pointer; font-family: var(--font-sans); }
   .vt-btn.active { background: var(--surface-1); color: var(--text-primary); font-weight: 500; }
   .sync-row { display: flex; align-items: center; gap: 8px; }
-  .refresh-btn { background: transparent; border: 1px solid var(--border-accent); color: var(--text-accent); border-radius: var(--radius); padding: 5px 11px; font-size: 12px; cursor: pointer; font-family: var(--font-sans); display: flex; align-items: center; gap: 4px; }
+  .refresh-btn { background: transparent; border: 1px solid var(--border-accent); color: var(--text-accent); border-radius: var(--radius); padding: 5px 11px; font-size: 12px; cursor: pointer; font-family: var(--font-sans); }
   .refresh-btn:hover { background: var(--bg-accent); }
   .refresh-btn.loading { opacity: .6; pointer-events: none; }
   .sync-time { font-size: 11px; color: var(--text-muted); }
@@ -66,14 +66,12 @@
   .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--border); align-items: center; }
   .leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
   .leg-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
-  /* Loading / error states */
   .state-banner { border-radius: var(--radius); padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; display: flex; align-items: center; gap: 10px; }
   .state-banner.loading { background: var(--bg-accent); border: 1px solid var(--border-accent); color: var(--text-accent); }
   .state-banner.error { background: var(--bg-warn); border: 1px solid var(--border-warn); color: var(--text-warn); }
   .state-banner.success { background: var(--bg-success); border: 1px solid var(--border-success); color: var(--text-success); }
   .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  /* Modal */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-start; justify-content: center; padding-top: 60px; z-index: 200; }
   .modal-card { background: #fff; border: 1px solid var(--border-strong); border-radius: 12px; padding: 1.4rem; width: 420px; max-width: 94vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.12); }
   .mc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 8px; }
@@ -91,7 +89,6 @@
   .status-confirmed { background: #d1fae5; color: #065f46; }
   .status-potential { background: #fef3c7; color: #92400e; }
   .status-hold { background: #fee2e2; color: #991b1b; }
-  /* List */
   .list-view { margin-top: .25rem; }
   .list-day { margin-bottom: 1.1rem; }
   .list-day-hdr { font-size: 11px; font-weight: 600; color: var(--text-secondary); padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
@@ -102,7 +99,6 @@
   .list-detail { font-size: 11px; color: var(--text-secondary); flex: 1.5; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .list-pod { font-size: 11px; color: var(--text-muted); white-space: nowrap; min-width: 50px; }
   .list-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
-  /* Source note */
   .source-note { font-size: 11px; color: var(--text-muted); margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
   .source-note a { color: var(--text-accent); text-decoration: none; }
   .source-note a:hover { text-decoration: underline; }
@@ -115,7 +111,7 @@
 <div class="toolbar">
   <div>
     <div class="toolbar-title">VMPN Recording Calendar</div>
-    <div class="toolbar-sub">Live from Skedda · Partner shows included</div>
+    <div class="toolbar-sub">Pod bookings only · Live from Skedda + partner shows</div>
   </div>
   <div class="view-toggle">
     <button class="vt-btn active" id="btn-month" onclick="setView('month')">Month</button>
@@ -160,22 +156,29 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const ICAL_URL = 'https://voxmedianewyork.skedda.com/ical?k=HavaMEF5xK9O_p7oYcMfgGCj34uUWWkc&i=841062';
-const CORS_PROXY = 'https://corsproxy.io/?';
-
-// Auto-refresh interval (ms) — 30 minutes
+const ICAL_URL    = 'https://voxmedianewyork.skedda.com/ical?k=HavaMEF5xK9O_p7oYcMfgGCj34uUWWkc&i=841062';
+const CORS_PROXY  = 'https://corsproxy.io/?';
 const AUTO_REFRESH_MS = 30 * 60 * 1000;
 
 // ============================================================
-// SHOW NAME FUZZY MAPPING
-// Keys are lowercase substrings to match against booking/summary
+// POD ALLOWLIST — only keep events in these spaces
+// Regex: matches "Pod" followed by a number anywhere in the
+// RESOURCES or SUMMARY field. Everything else is excluded.
+// ============================================================
+const POD_PATTERN = /pod\s*\d+/i;
+
+// ============================================================
+// SHOW NAME FUZZY MAP
 // ============================================================
 const SHOW_MAP = {
+  'a touch more':             'A Touch More',
   'atm recording':            'A Touch More',
+  'atm ':                     'A Touch More',
   'markets daily':            'Prof G: Markets',
   'markets main':             'Prof G: Markets',
   'markets interview':        'Prof G: Markets',
   'markets founder':          'Prof G: Markets',
+  'ed elson':                 'Prof G: Markets',
   'prof g markets':           'Prof G: Markets',
   'the week, from prof g':    'Prof G: Markets',
   'the week from prof g':     'Prof G: Markets',
@@ -200,30 +203,23 @@ const SHOW_MAP = {
   'channels w/ peter':        'Channels with Peter Kafka',
   'channels with peter':      'Channels with Peter Kafka',
   'america, actually':        'America, Actually',
-  'aa making':                'America, Actually',
+  'aa ':                      'America, Actually',
+  'aa:':                      'America, Actually',
   'create or destroy':        'Create or Destroy',
+  'cod ':                     'Create or Destroy',
   'project swagger':          'Project Swagger',
   'cut social':               'Cut Social',
   'chantal':                  'Cut Social',
+  'tefi talks':               'Tefi Talks',
+  'tefi ':                    'Tefi Talks',
+  'the gray area':            'The Gray Area',
+  'gray area':                'The Gray Area',
   'midge':                    'COA with Midge Purce',
   'coa with midge':           'COA with Midge Purce',
-  'version history':          'Version History',
 };
 
-// Booking summaries/spaces to EXCLUDE (non-recording holds)
-const EXCLUDE_PATTERNS = [
-  'production hold',
-  'stage d',
-  'green room',
-  'stage a',
-  'stage b',
-  'stage c',
-  'conference room',
-];
-
 // ============================================================
-// PARTNER SHOWS (static, manually refreshed)
-// Add new partner shows here as new arrays
+// PARTNER SHOWS — add new partner show arrays below
 // ============================================================
 const PARTNER_EVENTS = [
   // ---- HAPPY HOUR WITH INA GARTEN ----
@@ -261,7 +257,7 @@ const SOURCE_LABELS = {
 };
 
 // ============================================================
-// COLOR PALETTE
+// COLORS
 // ============================================================
 const PALETTE = [
   {bg:'#d6e8fa',tx:'#0c447c'},{bg:'#c8f0e0',tx:'#085041'},{bg:'#fce8d8',tx:'#4a1b0c'},
@@ -277,59 +273,54 @@ function clr(s) { if (!CLR[s]) { CLR[s] = PALETTE[ci % PALETTE.length]; ci++; } 
 // STATE
 // ============================================================
 let allEvents = [];
-let allShows = [];
-let active = new Set();
-let view = 'month';
-let vDate = new Date();
-vDate.setDate(1);
+let allShows  = [];
+let active    = new Set();
+let view      = 'month';
+// vDate initialized to current month — never reset on refresh
+let vDate = new Date(); vDate.setDate(1);
 
 // ============================================================
 // iCAL PARSER
 // ============================================================
 function parseIcal(text) {
-  const events = [];
-  const blocks = text.split('BEGIN:VEVENT').slice(1);
+  const events  = [];
+  const blocks  = text.split('BEGIN:VEVENT').slice(1);
 
   for (const block of blocks) {
-    // Extract fields
     const get = (key) => {
       const re = new RegExp(key + '[^:]*:([\\s\\S]*?)(?=\\r?\\n[A-Z])', 'i');
-      const m = block.match(re);
+      const m  = block.match(re);
       if (!m) return '';
-      // Unfold lines (iCal wraps long lines with \n + space)
       return m[1].replace(/\r?\n[ \t]/g, '').trim();
     };
 
-    const summary     = get('SUMMARY').replace(/\\,/g, ',').replace(/\\n/g, ' ');
-    const description = get('DESCRIPTION').replace(/\\,/g, ',').replace(/\\n/g, '\n');
+    const summary     = get('SUMMARY').replace(/\\,/g,',').replace(/\\n/g,' ');
+    const description = get('DESCRIPTION').replace(/\\,/g,',').replace(/\\n/g,'\n');
     const dtstart     = get('DTSTART');
     const dtend       = get('DTEND');
-    const resources   = get('RESOURCES').replace(/\\,/g, ',');
+    const resources   = get('RESOURCES').replace(/\\,/g,',');
     const attendeeRaw = get('ATTENDEE');
     const attendee    = (attendeeRaw.match(/CN=([^:;]+)/) || [])[1] || '';
 
     if (!dtstart) continue;
 
-    // Exclude non-recording holds
-    const summaryLower = summary.toLowerCase();
-    const resourcesLower = resources.toLowerCase();
-    if (EXCLUDE_PATTERNS.some(p => summaryLower.includes(p) || resourcesLower.includes(p))) continue;
+    // ---- POD ALLOWLIST FILTER ----
+    // Keep ONLY if the resources field OR summary contains "Pod N"
+    const combinedSpace = resources + ' ' + summary;
+    if (!POD_PATTERN.test(combinedSpace)) continue;
 
-    // Parse dates (format: 20260714T130000 in UTC-04)
+    // Parse datetimes
     const parseIcalDate = (s) => {
       const m = s.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/);
       if (!m) return null;
       return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]);
     };
-
     const start = parseIcalDate(dtstart);
     const end   = parseIcalDate(dtend);
     if (!start) continue;
 
-    // Format date string
     const d = `${start.getMonth()+1}/${start.getDate()}/${start.getFullYear()}`;
 
-    // Format time
     const fmtT = (dt) => {
       if (!dt) return '';
       let h = dt.getHours(), min = dt.getMinutes();
@@ -340,32 +331,30 @@ function parseIcal(text) {
     const s = fmtT(start);
     const e = end ? fmtT(end) : '';
 
-    // Extract pod from resources or summary
-    const podMatch = resources.match(/Pod\s*\d+/i) || summary.match(/Pod\s*\d+/i);
-    const pod = podMatch ? podMatch[0].replace(/\s+/g, ' ') : resources.split('(')[0].trim() || '—';
+    // Extract pod number from resources or summary
+    const podMatch = combinedSpace.match(/Pod\s*\d+/i);
+    const pod = podMatch ? podMatch[0].replace(/\s+/g,' ') : '—';
 
-    // Extract show and booking from summary/description
-    // Summary format: "Name: Booking Title (Pod X)"
-    const bookingRaw = summary.replace(/^[^:]+:\s*/, '').replace(/\s*\(Pod[^)]*\)/i, '').trim();
+    // Strip pod suffix from summary to get booking name
+    const bookingRaw = summary
+      .replace(/^[^:]+:\s*/, '')           // strip "ShowName: " prefix if present
+      .replace(/\s*\(Pod[^)]*\)/i, '')      // strip "(Pod X)" suffix
+      .trim();
 
-    // Extract talent from description
-    const talentMatch = description.match(/Talent\?\s*:\s*([^\n]+)/i);
-    const talent = talentMatch ? talentMatch[1].trim() : '';
+    // Extract fields from description
+    const talentMatch  = description.match(/Talent\??\s*:\s*([^\n]+)/i);
+    const talent       = talentMatch ? talentMatch[1].trim() : '';
 
-    // Extract show from description "What Show?: X"
-    const showMatch = description.match(/What Show\?\s*:\s*([^\n]+)/i);
-    const showRaw = showMatch ? showMatch[1].trim() : '';
+    const showMatch    = description.match(/What Show\??\s*:\s*([^\n]+)/i);
+    const showRaw      = showMatch ? showMatch[1].trim() : '';
 
-    // Extract op status
-    const opMatch = description.match(/Op Status\s*:\s*([^\n]+)/i);
-    const opStatus = opMatch ? opMatch[1].trim() : '';
+    const opMatch      = description.match(/Op(?:erator)? Status\s*:\s*([^\n]+)/i);
+    const opStatus     = opMatch ? opMatch[1].trim() : '';
 
-    // Resolve show name
-    const show = resolveShow(showRaw, bookingRaw, summaryLower);
+    const typeMatch    = description.match(/(?:Production )?Type\s*:\s*([^\n]+)/i);
+    const type         = typeMatch ? typeMatch[1].trim() : '';
 
-    // Extract type
-    const typeMatch = description.match(/Type\s*:\s*([^\n]+)/i);
-    const type = typeMatch ? typeMatch[1].trim() : '';
+    const show = resolveShow(showRaw, bookingRaw);
 
     events.push({ d, s, e, show, booking: bookingRaw, pod, type, talent, opStatus, booker: attendee, source: 'skedda' });
   }
@@ -373,27 +362,20 @@ function parseIcal(text) {
   return events;
 }
 
-function resolveShow(showField, booking, summaryLower) {
-  // First try explicit show field from description
-  if (showField && showField.toLowerCase() !== 'other' && showField.trim() !== '') {
-    // Check if it maps to something known
+function resolveShow(showField, booking) {
+  // 1. Try explicit show field from description
+  if (showField && !['other','tbd','n/a',''].includes(showField.toLowerCase())) {
     const sf = showField.toLowerCase();
     for (const [key, val] of Object.entries(SHOW_MAP)) {
       if (sf.includes(key)) return val;
     }
-    // Return as-is if it's a real show name
-    if (showField.length > 2 && !['other','tbd','n/a'].includes(sf)) return showField;
+    if (showField.length > 2) return showField;
   }
 
-  // Then try booking description
+  // 2. Try booking description
   const bl = booking.toLowerCase();
   for (const [key, val] of Object.entries(SHOW_MAP)) {
     if (bl.includes(key)) return val;
-  }
-
-  // Then try summary
-  for (const [key, val] of Object.entries(SHOW_MAP)) {
-    if (summaryLower.includes(key)) return val;
   }
 
   return 'Other / External';
@@ -403,14 +385,12 @@ function resolveShow(showField, booking, summaryLower) {
 // DATA LOADING
 // ============================================================
 async function loadAll() {
-  showState('loading', 'Fetching live studio bookings from Skedda…');
-  const btn = document.getElementById('sync-btn');
-  btn.classList.add('loading');
+  showState('loading', 'Fetching live pod bookings from Skedda…');
+  document.getElementById('sync-btn').classList.add('loading');
 
   let icalEvents = [];
-  let fetchedOk = false;
+  let fetchedOk  = false;
 
-  // Try direct fetch first, then CORS proxy
   for (const url of [ICAL_URL, CORS_PROXY + encodeURIComponent(ICAL_URL)]) {
     try {
       const res = await fetch(url, { cache: 'no-store' });
@@ -418,64 +398,59 @@ async function loadAll() {
         const text = await res.text();
         if (text.includes('BEGIN:VCALENDAR')) {
           icalEvents = parseIcal(text);
-          fetchedOk = true;
+          fetchedOk  = true;
           break;
         }
       }
-    } catch(e) { /* try next */ }
+    } catch(err) { /* try next */ }
   }
 
-  btn.classList.remove('loading');
+  document.getElementById('sync-btn').classList.remove('loading');
+  fetchedOk ? clearState() : showState('error', 'Could not reach Skedda — showing partner calendars only. Try syncing again.');
 
-  if (!fetchedOk) {
-    showState('error', 'Could not reach Skedda — showing partner calendars only. Check your network or try again.');
-  } else {
-    clearState();
-  }
-
-  // Merge iCal events with partner events
   allEvents = [...icalEvents, ...PARTNER_EVENTS];
 
-  // Rebuild show list, preserving color assignments
   const newShows = [...new Set(allEvents.map(e => e.show))];
-  newShows.forEach(s => clr(s)); // assign colors
-  allShows = newShows;
+  newShows.forEach(s => clr(s));
 
-  // Keep existing filter state for shows that still exist, add new ones as active
-  const newActive = new Set();
-  for (const s of allShows) {
-    if (active.size === 0 || active.has(s)) newActive.add(s);
-  }
-  active = newActive.size > 0 ? newActive : new Set(allShows);
+  // Preserve existing selections; activate new shows by default
+  const prevActive = new Set(active);
+  allShows = newShows;
+  active   = new Set(allShows.filter(s => prevActive.size === 0 || prevActive.has(s)));
+  if (active.size === 0) active = new Set(allShows);
 
   const now = new Date();
-  document.getElementById('export-date').textContent = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + ', ' + now.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-  document.getElementById('sync-time').textContent = `Synced ${now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}` + (fetchedOk ? ` · ${icalEvents.length} studio bookings` : ' · offline');
+  document.getElementById('export-date').textContent =
+    now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + ', ' +
+    now.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  document.getElementById('sync-time').textContent =
+    `Synced ${now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}` +
+    (fetchedOk ? ` · ${icalEvents.length} pod bookings` : ' · offline');
 
   buildFilters();
   view === 'month' ? renderMonth() : renderList();
 }
 
 function showState(type, msg) {
-  document.getElementById('state-area').innerHTML = `<div class="state-banner ${type}">
-    ${type === 'loading' ? '<div class="spinner"></div>' : type === 'error' ? '⚠' : '✓'}
-    <span>${msg}</span>
-  </div>`;
+  document.getElementById('state-area').innerHTML =
+    `<div class="state-banner ${type}">
+      ${type === 'loading' ? '<div class="spinner"></div>' : type === 'error' ? '⚠' : '✓'}
+      <span>${msg}</span>
+    </div>`;
 }
 function clearState() { document.getElementById('state-area').innerHTML = ''; }
 
 // ============================================================
-// FILTER BAR
+// FILTERS
 // ============================================================
 function buildFilters() {
   const row = document.getElementById('filter-row');
   row.innerHTML = '<span class="filter-label">Show:</span>';
-  const toggleBtn = document.createElement('button');
-  toggleBtn.id = 'toggle-all-btn';
-  toggleBtn.className = 'toggle-all';
-  toggleBtn.textContent = 'Deselect All';
-  toggleBtn.onclick = toggleAll;
-  row.appendChild(toggleBtn);
+  const btn = document.createElement('button');
+  btn.id = 'toggle-all-btn'; btn.className = 'toggle-all';
+  btn.textContent = active.size === allShows.length ? 'Deselect All' : 'Select All';
+  btn.onclick = toggleAll;
+  row.appendChild(btn);
   allShows.forEach(show => {
     const c = clr(show);
     const p = document.createElement('span');
@@ -491,7 +466,6 @@ function buildFilters() {
     };
     row.appendChild(p);
   });
-  updateToggleBtn();
 }
 
 function toggleAll() {
@@ -515,23 +489,25 @@ function filtered() { return allEvents.filter(e => active.has(e.show)); }
 function pDate(str) { const [m,d,y] = str.split('/'); return new Date(+y,+m-1,+d); }
 function fmtTime(t) {
   if (!t || t === 'TBD') return 'TBD';
-  return t.replace(':00 ', ' ').replace(' AM', ' am').replace(' PM', ' pm');
+  return t.replace(':00 ',' ').replace(' AM',' am').replace(' PM',' pm');
 }
 
 // ============================================================
 // MONTH VIEW
 // ============================================================
 function renderMonth() {
-  const grid = document.getElementById('cal-grid');
+  const grid  = document.getElementById('cal-grid');
   const label = document.getElementById('month-label');
   const y = vDate.getFullYear(), m = vDate.getMonth();
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   label.textContent = MONTHS[m] + ' ' + y;
+
   const first = new Date(y, m, 1).getDay();
-  const dim = new Date(y, m+1, 0).getDate();
+  const dim   = new Date(y, m+1, 0).getDate();
   const today = new Date();
   const byDate = {};
   filtered().forEach(ev => { (byDate[ev.d] = byDate[ev.d] || []).push(ev); });
+
   let cells = [];
   const prev = new Date(y, m, 0).getDate();
   for (let i = first-1; i >= 0; i--) cells.push({day: prev-i, curr: false});
@@ -541,25 +517,25 @@ function renderMonth() {
   grid.innerHTML = cells.map(cell => {
     const isToday = cell.curr && cell.dateObj &&
       cell.dateObj.getFullYear() === today.getFullYear() &&
-      cell.dateObj.getMonth() === today.getMonth() &&
-      cell.dateObj.getDate() === today.getDate();
-    const dateStr = cell.curr && cell.dateObj ?
-      `${cell.dateObj.getMonth()+1}/${cell.dateObj.getDate()}/${cell.dateObj.getFullYear()}` : '';
+      cell.dateObj.getMonth()    === today.getMonth() &&
+      cell.dateObj.getDate()     === today.getDate();
+    const dateStr = cell.curr && cell.dateObj
+      ? `${cell.dateObj.getMonth()+1}/${cell.dateObj.getDate()}/${cell.dateObj.getFullYear()}` : '';
     const evs = byDate[dateStr] || [];
     const pills = evs.map((ev, idx) => {
       const c = clr(ev.show);
-      const extraStyle = ev.source !== 'skedda' ? `;border:1.5px dashed ${c.tx}60` : '';
-      const shortName = ev.show === 'Happy Hour with Ina Garten' ? 'Happy Hour w/ Ina' : ev.show;
-      const timeLabel = fmtTime(ev.s);
-      const guestHint = ev.talent && ev.talent !== 'TBD' ? ' · ' + ev.talent.split(/[,/]/)[0].trim() : '';
-      return `<div class="ev" style="background:${c.bg};color:${c.tx}${extraStyle}" onclick="openModal(event,'${dateStr}',${idx})">
-        <span class="ev-name">${shortName}</span>
-        <span class="ev-time">${timeLabel}${guestHint}</span>
+      const dash = ev.source !== 'skedda' ? `;border:1.5px dashed ${c.tx}60` : '';
+      const short = ev.show === 'Happy Hour with Ina Garten' ? 'Happy Hour w/ Ina' : ev.show;
+      const guest = ev.talent && ev.talent !== 'TBD' ? ' · ' + ev.talent.split(/[,/]/)[0].trim() : '';
+      return `<div class="ev" style="background:${c.bg};color:${c.tx}${dash}" onclick="openModal(event,'${dateStr}',${idx})">
+        <span class="ev-name">${short}</span>
+        <span class="ev-time">${fmtTime(ev.s)}${guest}</span>
       </div>`;
     }).join('');
     return `<div class="day-cell${cell.curr ? '' : ' other'}${isToday ? ' today' : ''}">
       <div class="day-num">${cell.day}</div>${pills}</div>`;
   }).join('');
+
   renderLegend();
 }
 
@@ -568,7 +544,8 @@ function renderLegend() {
   leg.innerHTML = allShows.map(s => {
     const c = clr(s);
     return `<div class="leg-item"><div class="leg-dot" style="background:${c.bg};border:1px solid ${c.tx}40"></div><span>${s}</span></div>`;
-  }).join('') + `<div class="leg-item" style="margin-left:auto;padding-left:12px;border-left:1px solid var(--border)">
+  }).join('') +
+  `<div class="leg-item" style="margin-left:auto;padding-left:12px;border-left:1px solid var(--border)">
     <span style="display:inline-block;width:14px;height:10px;border:1.5px dashed #888;border-radius:2px;margin-right:5px;vertical-align:middle"></span>
     <span>Partner calendar</span>
   </div>`;
@@ -584,14 +561,14 @@ function renderList() {
   const sorted = Object.keys(byDate).sort((a,b) => pDate(a) - pDate(b));
   const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   con.innerHTML = sorted.map(date => {
-    const d = pDate(date);
+    const d   = pDate(date);
     const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
     const hdr = `${dow}, ${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
     const rows = byDate[date].map((ev, idx) => {
-      const c = clr(ev.show);
-      const borderStyle = ev.source !== 'skedda' ? `border:1.5px dashed ${c.tx}60;border-radius:4px;padding:6px 5px;` : '';
+      const c      = clr(ev.show);
+      const border = ev.source !== 'skedda' ? `border:1.5px dashed ${c.tx}60;border-radius:4px;padding:6px 5px;` : '';
       const detail = ev.talent && ev.talent !== 'TBD' ? ev.talent : ev.booking;
-      return `<div class="list-ev" style="${borderStyle}" onclick="openModal(event,'${date}',${idx})">
+      return `<div class="list-ev" style="${border}" onclick="openModal(event,'${date}',${idx})">
         <div class="list-dot" style="background:${c.bg};border:1px solid ${c.tx}50"></div>
         <div class="list-show">${ev.show}</div>
         <div class="list-detail">${detail}</div>
@@ -609,20 +586,21 @@ function renderList() {
 function openModal(e, dateStr, idx) {
   e.stopPropagation();
   const evs = allEvents.filter(ev => ev.d === dateStr && active.has(ev.show));
-  const ev = evs[idx]; if (!ev) return;
+  const ev  = evs[idx]; if (!ev) return;
   showModal(ev);
 }
 
 function showModal(ev) {
   const c = clr(ev.show);
-  const talentChips = ev.talent && ev.talent !== '—' && ev.talent !== 'No' && ev.talent !== 'NA' && ev.talent !== 'TBD' ?
-    ev.talent.split(/,\s*/).map(t => `<span class="talent-chip">${t.trim()}</span>`).join('')
+  const talentChips = ev.talent && !['—','no','na','tbd',''].includes(ev.talent.toLowerCase())
+    ? ev.talent.split(/,\s*/).map(t => `<span class="talent-chip">${t.trim()}</span>`).join('')
     : '<span style="color:#888;font-size:13px">TBD</span>';
-  const statusBadge = ev.status ? `<div class="mc-row"><span class="mc-key">📋 Status</span><span class="mc-val"><span class="status-chip status-${ev.status}">${ev.status === 'confirmed' ? '✓ Confirmed' : ev.status === 'potential' ? '⏳ Potential' : '⚠ Hold'}</span></span></div>` : '';
-  const opRow = ev.opStatus ? `<div class="mc-row"><span class="mc-key">🎛 Op Status</span><span class="mc-val">${ev.opStatus}</span></div>` : '';
-  const bookerRow = ev.booker ? `<div class="mc-row"><span class="mc-key">👤 Booker</span><span class="mc-val">${ev.booker}</span></div>` : '';
-  const drinkRow = ev.drink ? `<div class="mc-row"><span class="mc-key">🍹 Drink</span><span class="mc-val">${ev.drink}</span></div>` : '';
-  const timeDisplay = ev.s === 'TBD' ? 'TBD' : `${ev.s}${ev.e ? ' – ' + ev.e : ''}`;
+  const statusRow  = ev.status   ? `<div class="mc-row"><span class="mc-key">📋 Status</span><span class="mc-val"><span class="status-chip status-${ev.status}">${ev.status==='confirmed'?'✓ Confirmed':ev.status==='potential'?'⏳ Potential':'⚠ Hold'}</span></span></div>` : '';
+  const opRow      = ev.opStatus ? `<div class="mc-row"><span class="mc-key">🎛 Op Status</span><span class="mc-val">${ev.opStatus}</span></div>` : '';
+  const bookerRow  = ev.booker   ? `<div class="mc-row"><span class="mc-key">👤 Booker</span><span class="mc-val">${ev.booker}</span></div>` : '';
+  const drinkRow   = ev.drink    ? `<div class="mc-row"><span class="mc-key">🍹 Drink</span><span class="mc-val">${ev.drink}</span></div>` : '';
+  const timeStr    = ev.s === 'TBD' ? 'TBD' : `${ev.s}${ev.e ? ' – ' + ev.e : ''}`;
+
   document.getElementById('modal-root').innerHTML = `<div class="modal-bg" onclick="closeModal()">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="mc-header">
@@ -633,12 +611,15 @@ function showModal(ev) {
       <span class="mc-source">📂 ${SOURCE_LABELS[ev.source] || ev.source}</span>
       <hr class="mc-divider">
       <div class="mc-row"><span class="mc-key">📅 Date</span><span class="mc-val">${ev.d}</span></div>
-      <div class="mc-row"><span class="mc-key">🕐 Time</span><span class="mc-val">${timeDisplay}</span></div>
+      <div class="mc-row"><span class="mc-key">🕐 Time</span><span class="mc-val">${timeStr}</span></div>
       <div class="mc-row"><span class="mc-key">📺 Studio</span><span class="mc-val">${ev.pod}</span></div>
       ${ev.type ? `<div class="mc-row"><span class="mc-key">🎬 Type</span><span class="mc-val">${ev.type}</span></div>` : ''}
-      ${statusBadge}${opRow}${bookerRow}
+      ${statusRow}${opRow}${bookerRow}
       <hr class="mc-divider">
-      <div class="mc-row" style="align-items:flex-start"><span class="mc-key" style="padding-top:4px">🎤 Talent</span><span class="mc-val">${talentChips}</span></div>
+      <div class="mc-row" style="align-items:flex-start">
+        <span class="mc-key" style="padding-top:4px">🎤 Talent</span>
+        <span class="mc-val">${talentChips}</span>
+      </div>
       ${drinkRow}
     </div></div>`;
 }
@@ -650,10 +631,10 @@ function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
 // ============================================================
 function setView(v) {
   view = v;
-  document.getElementById('month-view').style.display = v === 'month' ? '' : 'none';
-  document.getElementById('list-view').style.display = v === 'list' ? '' : 'none';
+  document.getElementById('month-view').style.display  = v === 'month' ? '' : 'none';
+  document.getElementById('list-view').style.display   = v === 'list'  ? '' : 'none';
   document.getElementById('btn-month').classList.toggle('active', v === 'month');
-  document.getElementById('btn-list').classList.toggle('active', v === 'list');
+  document.getElementById('btn-list').classList.toggle('active',  v === 'list');
   v === 'list' ? renderList() : renderMonth();
 }
 function prevMonth() { vDate = new Date(vDate.getFullYear(), vDate.getMonth()-1, 1); renderMonth(); }
