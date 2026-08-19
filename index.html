@@ -145,7 +145,7 @@
 <div class="source-note">
   <span>&#128225; <strong>Live:</strong> <a href="https://voxmedianewyork.skedda.com" target="_blank">Skedda</a></span>
   <span>&#128203; <strong>Partner:</strong> <a href="https://docs.google.com/spreadsheets/d/1j30yIoxKV5nNWAS50T3OzTK1JfhD-YcBxCqxHMIygVM/edit" target="_blank">Happy Hour with Ina Garten</a></span>
-  <span style="margin-left:auto">Last synced: August 19, 2026 at 12:52 AM ET</span>
+  <span style="margin-left:auto">Last synced: August 19, 2026 at 9:26 AM ET</span>
 </div>
 </div></div>
 <script>
@@ -169,7 +169,7 @@ async function loadEvents(){
     const resp=await fetch("events.json?t="+Date.now());
     if(!resp.ok)throw new Error("HTTP "+resp.status);
     E=await resp.json();
-    allShows=[...new Set(E.map(e=>e.show))];
+    allShows=[...new Set(E.map(e=>e.show))].sort((a,b)=>a.localeCompare(b));
     allShows.forEach(s=>clr(s));
     const prev=new Set(active);
     active=new Set(allShows.filter(s=>prev.size===0||prev.has(s)));
