@@ -146,12 +146,13 @@
   <span>&#128225; <strong>Live:</strong> <a href="https://voxmedianewyork.skedda.com" target="_blank">Skedda</a></span>
   <span>&#128203; <strong>Partner:</strong> <a href="https://docs.google.com/spreadsheets/d/1j30yIoxKV5nNWAS50T3OzTK1JfhD-YcBxCqxHMIygVM/edit" target="_blank">Happy Hour with Ina Garten</a></span>
   <span>&#128203; <strong>Partner:</strong> <a href="https://docs.google.com/spreadsheets/d/1htU7HsFkTONfnA8QlgDmS1F3J6Yf7tyPQ-PVK7H1Fec/edit" target="_blank">Bird's Eye View</a></span>
-  <span style="margin-left:auto">Last synced: August 27, 2026 at 12:52 PM ET</span>
+  <span style="margin-left:auto">Last synced: August 27, 2026 at 2:39 PM ET</span>
 </div>
 </div></div>
 <script>
 const PODS=[{key:"Pod 1",label:"Pod 1",sub:"4 Seat, Multicam"},{key:"Pod 2",label:"Pod 2",sub:"2 Seat, Multicam"},{key:"Pod 3",label:"Pod 3",sub:"1 Seat, Multicam"},{key:"Pod 4",label:"Pod 4",sub:"1 Seat, Virtual BG"},{key:"Pod 5",label:"Pod 5",sub:"2 Seats, Virtual BG"},{key:"Pod 6",label:"Pod 6",sub:"2 Seats, Multicam"}];
-const SOURCE_LABELS={skedda:"Skedda (Live)",happyhour:"Happy Hour with Ina Garten",birdseyeview:"Bird's Eye View"};
+const SOURCE_LABELS={skedda:"Skedda (Live)",happyhour:"Happy Hour with Ina Garten",birdseyeview:"Bird's Eye View",inthebooth:"In The Booth with Babish"};
+const SHORT_NAMES={"Happy Hour with Ina Garten":"Happy Hour w/ Ina","In The Booth with Babish":"In The Booth"};
 const PALETTE=[{bg:"#d6e8fa",tx:"#0c447c"},{bg:"#c8f0e0",tx:"#085041"},{bg:"#fce8d8",tx:"#4a1b0c"},{bg:"#ece8fc",tx:"#26215c"},{bg:"#fde8f0",tx:"#4b1528"},{bg:"#faf3da",tx:"#412402"},{bg:"#dff4e8",tx:"#173404"},{bg:"#f9e0e0",tx:"#501313"},{bg:"#e8f4fc",tx:"#042c53"},{bg:"#f5ece0",tx:"#3a2010"},{bg:"#e4f0e8",tx:"#1a3a22"},{bg:"#f0e8f8",tx:"#3a1560"},{bg:"#fef9e0",tx:"#7a5c00"},{bg:"#f0f4e8",tx:"#2a3a04"},{bg:"#e8f0fc",tx:"#042c63"}];
 const CLR={};let ci=0;
 function clr(s){if(!CLR[s]){CLR[s]=PALETTE[ci%PALETTE.length];ci++;}return CLR[s];}
@@ -222,7 +223,7 @@ function renderMonth(){
     const evs=byDate[ds]||[];
     const pills=evs.map((ev,idx)=>{
       const c=clr(ev.show);const dash=ev.source!=="skedda"?";border:1.5px dashed "+c.tx+"60":"";
-      const short=ev.show==="Happy Hour with Ina Garten"?"Happy Hour w/ Ina":ev.show;
+      const short=SHORT_NAMES[ev.show]||ev.show;
       const guest=ev.talent&&ev.talent!=="TBD"?" · "+ev.talent.split(/[,\/]/)[0].trim():"";
       return "<div class=\"ev\" style=\"background:"+c.bg+";color:"+c.tx+dash+"\" onclick=\"openModal(event,'"+ds+"',"+idx+")\">"+"<span class=\"ev-name\">"+short+"</span>"+"<span class=\"ev-time\">"+fmtTime(ev.s)+guest+"</span></div>";
     }).join("");
@@ -249,7 +250,7 @@ function renderStudio(){
       const evs=byDatePod[ds+"|"+pod.key]||[];let cc="";
       evs.forEach(ev=>{
         const c=clr(ev.show);const border=ev.source!=="skedda"?"border:1.5px dashed "+c.tx+"60;":"";
-        const short=ev.show==="Happy Hour with Ina Garten"?"Happy Hour w/ Ina":ev.show;
+        const short=SHORT_NAMES[ev.show]||ev.show;
         const timeStr=ev.s==="TBD"?"TBD":fmtTime(ev.s)+(ev.e?"–"+fmtTime(ev.e):"");
         const tal=ev.talent&&ev.talent!=="TBD"?ev.talent.split(/[,\/]/)[0].trim():"";
         const safeEv=JSON.stringify(ev).replace(/"/g,"&quot;");
