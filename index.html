@@ -146,7 +146,7 @@
   <span>&#128225; <strong>Live:</strong> <a href="https://voxmedianewyork.skedda.com" target="_blank">Skedda</a></span>
   <span>&#128203; <strong>Partner:</strong> <a href="https://docs.google.com/spreadsheets/d/1j30yIoxKV5nNWAS50T3OzTK1JfhD-YcBxCqxHMIygVM/edit" target="_blank">Happy Hour with Ina Garten</a></span>
   <span>&#128203; <strong>Partner:</strong> <a href="https://docs.google.com/spreadsheets/d/1htU7HsFkTONfnA8QlgDmS1F3J6Yf7tyPQ-PVK7H1Fec/edit" target="_blank">Bird's Eye View</a></span>
-  <span style="margin-left:auto">Last synced: August 27, 2026 at 2:39 PM ET</span>
+  <span style="margin-left:auto">Last synced: August 27, 2026 at 2:46 PM ET</span>
 </div>
 </div></div>
 <script>
@@ -156,7 +156,7 @@ const SHORT_NAMES={"Happy Hour with Ina Garten":"Happy Hour w/ Ina","In The Boot
 const PALETTE=[{bg:"#d6e8fa",tx:"#0c447c"},{bg:"#c8f0e0",tx:"#085041"},{bg:"#fce8d8",tx:"#4a1b0c"},{bg:"#ece8fc",tx:"#26215c"},{bg:"#fde8f0",tx:"#4b1528"},{bg:"#faf3da",tx:"#412402"},{bg:"#dff4e8",tx:"#173404"},{bg:"#f9e0e0",tx:"#501313"},{bg:"#e8f4fc",tx:"#042c53"},{bg:"#f5ece0",tx:"#3a2010"},{bg:"#e4f0e8",tx:"#1a3a22"},{bg:"#f0e8f8",tx:"#3a1560"},{bg:"#fef9e0",tx:"#7a5c00"},{bg:"#f0f4e8",tx:"#2a3a04"},{bg:"#e8f0fc",tx:"#042c63"}];
 const CLR={};let ci=0;
 function clr(s){if(!CLR[s]){CLR[s]=PALETTE[ci%PALETTE.length];ci++;}return CLR[s];}
-let E=[],allShows=[],active=new Set(),view="month";
+let E=[],allShows=[],active=new Set(),knownShows=new Set(),view="month";
 let vDate=new Date();vDate.setDate(1);
 let wDate=getWeekStart(new Date());
 function getWeekStart(d){const day=d.getDay();const diff=day===0?-6:1-day;const m=new Date(d);m.setDate(d.getDate()+diff);m.setHours(0,0,0,0);return m;}
@@ -174,8 +174,14 @@ async function loadEvents(){
     allShows=[...new Set(E.map(e=>e.show))].sort((a,b)=>a.localeCompare(b));
     allShows.forEach(s=>clr(s));
     const prev=new Set(active);
-    active=new Set(allShows.filter(s=>prev.size===0||prev.has(s)));
+    // A show is "new" if we've never seen it in a previous successful
+    // load this session. New shows default to visible even after a live
+    // Sync click (not just a full page reload) — otherwise a newly-added
+    // partner show quietly shows up dimmed/off in the filter pills and
+    // never renders until someone notices and clicks it on.
+    active=new Set(allShows.filter(s=>prev.size===0||prev.has(s)||!knownShows.has(s)));
     if(active.size===0)active=new Set(allShows);
+    knownShows=new Set(allShows);
     clearState();
     document.getElementById("sync-time").textContent="Synced "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+" · "+E.length+" events";
     buildFilters();
